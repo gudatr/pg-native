@@ -1,14 +1,14 @@
 let Libpq = require('libpq')
 let EventEmitter = require('events').EventEmitter
-let typeParsers = require('pg-types').types
+let typeParsers = require('pg-types');
 let util = require('util')
 
 //Reduces the lookup timefor the parser
 let typesFlat = [];
 
 for (let type in typeParsers.builtins) {
-    let parser = typesFlat.getTypeParser(type, 'text');
-    let parserId = typesFlat.builtins[type];
+    let parser = typeParsers.getTypeParser(type, 'text');
+    let parserId = typeParsers.builtins[type];
 
     typesFlat[parserId] = parser;
 }
@@ -77,7 +77,7 @@ Client.prototype.consumeFields = function () {
     }
 }
 
-Client.prototype.connectSync = function (params, cb) {
+Client.prototype.connect = function (params, cb) {
     this.fieldNames = []
     this.fieldTypes = []
     this.pq.connectSync(params)
@@ -90,11 +90,6 @@ Client.prototype.query = function (text, reject, resolve) {
     this._queryResolve = resolve
     this._queryReject = reject
     this._waitForDrain()
-}
-
-Client.prototype.querySync = function (text) {
-    if (!this.pq.$exec(text)) throw new Error(this.pq.$getLastErrorMessage() || 'Something went wrong dispatching the query')
-    return true
 }
 
 Client.prototype.prepare = function (statementName, text, nParams, reject, resolve) {
@@ -120,9 +115,7 @@ Client.prototype._waitForDrain = function () {
     if (res === 0) return this._startReading()
     // res of -1 is failure
     if (res === -1) return this._queryReject(this.pq.$getLastErrorMessage())
-    // otherwise outgoing message didn't flush to socket
-    // wait for it to flush and try again
-    // you cannot read & write on a socket at the same time
+    // otherwise outgoing message didn't flush to socket, wait again
     return this.pq.writable(this._waitForDrain)
 }
 
@@ -171,19 +164,16 @@ Client.prototype._read = function () {
     // read waiting data from the socket
     // e.g. clear the pending 'select'
     if (!this.pq.$consumeInput()) {
-        // if consumeInput returns false
-        // than a read error has been encountered
+        // if consumeInput returns false a read error has been encountered
         return this._readError()
     }
 
-    // check if there is still outstanding data
-    // if so, wait for it all to come in
+    // check if there is still outstanding data and wait for it
     if (this.pq.$isBusy()) {
         return
     }
 
-    // load our result object
-
+    // load result object
     while (this.pq.$getResult()) {
         let resultStatus = this._emitResult(this.pq)
 
