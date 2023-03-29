@@ -1,0 +1,25 @@
+{
+  "name": "pg-native",
+  "version": "1.0.0",
+  "description": "A severely trimmed down version of brianc/node-pg-native",
+  "main": "index.js",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/gudatr/pg-native.git"
+  },
+  "keywords": [
+    "postgres",
+    "pg",
+    "libpq"
+  ],
+  "author": "Robert Gudat",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/gudatr/pg-native/issues"
+  },
+  "homepage": "https://github.com/gudatr/pg-native",
+  "dependencies": {
+    "pg-types": "4.0.1",
+    "libpq": "^1.8.10"
+  }
+}
