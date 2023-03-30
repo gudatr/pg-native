@@ -18,7 +18,7 @@ client.connect(connectionString, (err) => {
 
 ```javascript
 await new Promise((resolve, reject) => {
-    this.client.query(query, reject, resolve);
+    client.query(query, reject, resolve);
 });
 ```
 
@@ -26,15 +26,15 @@ await new Promise((resolve, reject) => {
 
 ```javascript
 await new Promise((resolve, reject) => {
-    this.client.prepare(queryName, text, values.length, reject, () => {
-        this.client.execute(queryName, values, reject, resolve);
+    client.prepare(queryName, text, values.length, reject, () => {
+        client.execute(queryName, values, reject, resolve);
     });
 });
 ```
 
 This is not intended to be used on its own, instead use the npm package pg-pool-minimal.
 
-Checkout brianc/node-pg-native for the original version with extensible documentation.
+Checkout brianc/node-pg-native for the original version with extensive documentation.
 
 #### Future Plans
 
