@@ -16,24 +16,23 @@ for (let type in typeParsers.builtins) {
 const types = typesFlat;
 const NOTIFICATION = 'notification'
 
-let Client = module.exports = function (config) {
+let Client = module.exports = function (arrayOnly = false) {
     if (!(this instanceof Client)) {
-        return new Client(config)
+        return new Client(parseObjects)
     }
 
-    config = config || {}
-
-    EventEmitter.call(this)
+    EventEmitter.call(this);
+    this.parse = (arrayOnly ? parseArray : parseObject).bind(this);
     this.pq = new Libpq()
     this._reading = false
     this._read = this._read.bind(this)
     this._rows = []
-    this._queryResolve = (_rows) => { }
-    this._queryReject = (_err) => { }
-    this._queryError = undefined
+    this._resolve = (_rows) => { }
+    this._reject = (_err) => { }
+    this._error = undefined
     this.nfields = 0
-    this.fieldNames = []
-    this.fieldTypes = []
+    this.names = []
+    this.types = []
 
     // lazy start the reader if notifications are listened for
     // this way if you only run sync queries you wont block
@@ -50,36 +49,44 @@ util.inherits(Client, EventEmitter)
 Client.prototype.readValue = function (rowIndex, fieldIndex) {
     let rawValue = this.pq.$getvalue(rowIndex, fieldIndex)
     if (rawValue === '' && this.pq.$getisnull(rowIndex, fieldIndex)) return null
-    let parser = this.fieldTypes[fieldIndex]
+    let parser = this.types[fieldIndex]
     if (parser) return parser(rawValue)
     return rawValue
 }
 
-Client.prototype.consumeRowAsObject = function (rowIndex) {
-    let row = {}
+let parseObject = function (rowIndex) {
+    let row = {};
     for (let fieldIndex = 0; fieldIndex < this.nfields; fieldIndex++) {
-        row[this.fieldNames[fieldIndex]] = this.readValue(rowIndex, fieldIndex)
+        row[this.names[fieldIndex]] = this.readValue(rowIndex, fieldIndex)
     }
-    return row
+    return row;
+}
+
+let parseArray = function (rowIndex) {
+    let row = new Array(this.nfields);
+    for (let fieldIndex = 0; fieldIndex < this.nfields; fieldIndex++) {
+        row[fieldIndex] = this.readValue(rowIndex, fieldIndex);
+    }
+    return row;
 }
 
 Client.prototype.consumeFields = function () {
     this.nfields = this.pq.$nfields()
     for (let x = 0; x < this.nfields; x++) {
-        this.fieldNames[x] = this.pq.$fname(x)
-        this.fieldTypes[x] = types[this.pq.$ftype(x)]
+        this.names[x] = this.pq.$fname(x)
+        this.types[x] = types[this.pq.$ftype(x)]
     }
 
     let tupleCount = this.pq.$ntuples()
     this._rows = new Array(tupleCount)
     for (let i = 0; i < tupleCount; i++) {
-        this._rows[i] = this.consumeRowAsObject(i)
+        this._rows[i] = this.parse(i);
     }
 }
 
 Client.prototype.connect = function (params, cb) {
-    this.fieldNames = []
-    this.fieldTypes = []
+    this.names = []
+    this.types = []
     this.pq.connectSync(params)
     if (!this.pq.$setNonBlocking(1)) return cb(new Error('Unable to set non-blocking to true'))
 }
@@ -87,24 +94,24 @@ Client.prototype.connect = function (params, cb) {
 Client.prototype.query = function (text, reject, resolve) {
     this._stopReading()
     if (!this.pq.$sendQuery(text)) return reject(new Error(this.pq.$getLastErrorMessage() || 'Something went wrong dispatching the query'))
-    this._queryResolve = resolve
-    this._queryReject = reject
+    this._resolve = resolve
+    this._reject = reject
     this._waitForDrain()
 }
 
 Client.prototype.prepare = function (statementName, text, nParams, reject, resolve) {
     this._stopReading()
     if (!this.pq.$sendPrepare(statementName, text, nParams)) return reject(new Error(this.pq.$getLastErrorMessage() || 'Something went wrong dispatching the query'))
-    this._queryResolve = resolve
-    this._queryReject = reject
+    this._resolve = resolve
+    this._reject = reject
     this._waitForDrain()
 }
 
 Client.prototype.execute = function (statementName, parameters, reject, resolve) {
     this._stopReading()
     if (!this.pq.$sendQueryPrepared(statementName, parameters)) return reject(new Error(this.pq.$getLastErrorMessage() || 'Something went wrong dispatching the query'))
-    this._queryResolve = resolve
-    this._queryReject = reject
+    this._resolve = resolve
+    this._reject = reject
     this._waitForDrain()
 }
 
@@ -114,17 +121,9 @@ Client.prototype._waitForDrain = function () {
     // res of 0 is success
     if (res === 0) return this._startReading()
     // res of -1 is failure
-    if (res === -1) return this._queryReject(this.pq.$getLastErrorMessage())
+    if (res === -1) return this._reject(this.pq.$getLastErrorMessage())
     // otherwise outgoing message didn't flush to socket, wait again
     return this.pq.writable(this._waitForDrain)
-}
-
-Client.prototype.escapeLiteral = function (value) {
-    return this.pq.$escapeLiteral(value)
-}
-
-Client.prototype.escapeIdentifier = function (value) {
-    return this.pq.$escapeIdentifier(value)
 }
 
 Client.prototype._readError = function (message) {
@@ -146,7 +145,7 @@ Client.prototype._emitResult = function () {
             this.consumeFields()
             break
         case 'PGRES_FATAL_ERROR':
-            this._queryError = new Error(this.pq.$resultErrorMessage())
+            this._error = new Error(this.pq.$resultErrorMessage())
             break
         case 'PGRES_COPY_OUT':
         case 'PGRES_COPY_BOTH': {
@@ -190,17 +189,13 @@ Client.prototype._read = function () {
         }
     }
 
-    if (this._queryError) {
-        let err = this._queryError
-        this._queryError = undefined
-        return this._queryReject(err)
+    if (this._error) {
+        let err = this._error
+        this._error = undefined
+        return this._reject(err)
     }
 
-    let rows = this._rows
-    this._queryError = undefined
-    this._rows = undefined
-
-    this._queryResolve(rows)
+    this._resolve(this._rows)
 }
 
 // ensures the client is reading and
