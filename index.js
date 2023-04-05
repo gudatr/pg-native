@@ -18,7 +18,7 @@ const NOTIFICATION = 'notification'
 
 let Client = module.exports = function (arrayOnly = false) {
     if (!(this instanceof Client)) {
-        return new Client(parseObjects)
+        return new Client(arrayOnly)
     }
 
     EventEmitter.call(this);
