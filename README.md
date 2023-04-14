@@ -2,7 +2,7 @@
 
 A severely trimmed down version of brianc/node-pg-native to fit the needs of the pg-pool-minimal package.
 
-This is not intended to be used on its own, it was originally used in the package pg-pool-minimal but since v1.2.0 the pool directly used the libpq connection.
+This is not intended to be used on its own, it was originally used in the package pg-pool-minimal but since v1.2.0 the pool directly uses the connection created by the libpq bindings.
 
 ### Usage
 
