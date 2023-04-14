@@ -1,5 +1,8 @@
 # pg-native
+
 A severely trimmed down version of brianc/node-pg-native to fit the needs of the pg-pool-minimal package.
+
+This is not intended to be used on its own, it was originally used in the package pg-pool-minimal but since v1.2.0 the pool directly used the libpq connection.
 
 ### Usage
 
@@ -32,10 +35,4 @@ await new Promise((resolve, reject) => {
 });
 ```
 
-This is not intended to be used on its own, instead use the npm package pg-pool-minimal.
-
 Checkout brianc/node-pg-native for the original version with extensive documentation.
-
-#### Future Plans
-
-Transforming the client into a typescript class to further reduce the range of possible bugs by introducing typesafety. 
